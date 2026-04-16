@@ -1,0 +1,169 @@
+package com.userservice.service;
+ 
+import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import org.springframework.security.web.SecurityFilterChain;
+
+import org.springframework.stereotype.Service;
+
+import com.userservice.entity.User;
+
+import com.userservice.exception.AccountBlockedException;
+
+import com.userservice.exception.IncorrectPasswordException;
+
+import com.userservice.exception.MultipleAccountsFoundException;
+
+import com.userservice.exception.UsernameAlreadyExistsException;
+
+import com.userservice.repo.UserRepository;
+
+import java.util.List;
+ 
+ 
+@Service
+
+public class UserService {
+ 
+    private static final String UNF="User not found";
+ 
+    @Autowired
+
+    private UserRepository userRepository;
+ 
+    @Autowired
+
+    private BCryptPasswordEncoder passwordEncoder;
+ 
+    UserService(SecurityFilterChain filterChain) {
+
+    }
+    public User createUser(String username, String password, User.Role role, boolean temporaryPassword) {
+    	if(username==null||username.trim().isEmpty()) {
+    		throw new IllegalArgumentException("USername cannot be empty");
+    
+    	}
+
+        if (userRepository.existsByUsername(username)) {
+
+            throw new UsernameAlreadyExistsException("Username already exists");
+
+        }
+
+        User user = new User();
+
+        user.setUsername(username);
+
+        user.setPassword(passwordEncoder.encode(password));
+
+        user.setRole(role);
+
+        user.setTemporaryPassword(temporaryPassword);
+
+        return userRepository.save(user);
+
+    }
+ 
+ 
+
+    public User createUser(String username, String password, User.Role role) {
+
+        return createUser(username, password, role, false);
+
+    }
+
+    public User login(String username, String password) {
+
+        User user;
+
+        try {
+
+            user = userRepository.findByUsername(username)
+
+                .orElseThrow(() -> new UsernameNotFoundException(UNF));
+
+        } catch (org.springframework.dao.IncorrectResultSizeDataAccessException e) {
+
+        	throw new MultipleAccountsFoundException("Multiple accounts found. Contact admin.");       
+
+        	}
+ 
+        if (user.isBlocked()) {
+
+            throw new AccountBlockedException("Your account is blocked. Contact admin.");
+
+        }
+
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+
+            throw new IncorrectPasswordException("Incorrect password");
+
+        }
+
+        return user;
+
+    }
+ 
+
+
+    public User changePassword(Long userId, String currentPassword, String newPassword) {
+
+        User user = userRepository.findById(userId)
+
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+ 
+        // If this is a first-login temp-password change, skip current password validation
+
+        if (!user.isTemporaryPassword() && !passwordEncoder.matches(currentPassword, user.getPassword())) {
+
+                throw new IncorrectPasswordException("Current password is incorrect");
+
+            }
+
+        
+ 
+        user.setPassword(passwordEncoder.encode(newPassword));
+
+        user.setTemporaryPassword(false);
+
+        return userRepository.save(user);
+
+    }
+ 
+
+    public List<User> getAllUsers() {
+
+        return userRepository.findAll();
+
+    }
+ 
+    public User blockUser(Long id) {
+
+        User user = userRepository.findById(id)
+
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+
+        user.setBlocked(true);
+
+        return userRepository.save(user);
+
+    }
+ 
+    public User unblockUser(Long id) {
+
+        User user = userRepository.findById(id)
+
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+
+        user.setBlocked(false);
+
+        return userRepository.save(user);
+
+    }
+
+}
+ 

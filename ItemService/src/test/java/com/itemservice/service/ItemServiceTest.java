@@ -1,0 +1,217 @@
+package com.itemservice.service;
+ 
+import com.itemservice.entity.Item;
+import com.itemservice.repository.ItemRepository; 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test; 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+import java.util.Optional;
+ 
+@SpringBootTest class ItemServiceTest {
+ 
+@MockBean
+private ItemRepository itemRepository;
+ 
+@Autowired
+private ItemService itemService;
+ 
+private Item foundItem;
+private Item lostItem;
+private Item searchingItem;
+private Item matchedItem;
+ 
+@BeforeEach
+void setUp() {
+    foundItem = new Item();
+    foundItem.setId(1L);
+    foundItem.setItemName("Black Wallet");
+    foundItem.setCategory("Wallet");
+    foundItem.setLocation("Library");
+    foundItem.setDescription("Found near reception");
+    foundItem.setReportType(Item.ReportType.FOUND);
+    foundItem.setStatus(Item.Status.FOUND);
+    foundItem.setReportedBy(3L);
+    foundItem.setUrgent(false);
+ 
+    lostItem = new Item();
+    lostItem.setId(2L);
+    lostItem.setItemName("Blue Bag");
+    lostItem.setCategory("Bag");
+    lostItem.setLocation("Canteen");
+    lostItem.setReportType(Item.ReportType.LOST);
+    lostItem.setStatus(Item.Status.LOST);
+    lostItem.setReportedBy(5L);
+    lostItem.setUrgent(false);
+ 
+    searchingItem = new Item();
+    searchingItem.setId(3L);
+    searchingItem.setItemName("Lost Keys");
+    searchingItem.setCategory("Keys");
+    searchingItem.setReportType(Item.ReportType.LOST);
+    searchingItem.setStatus(Item.Status.SEARCHING);
+    searchingItem.setReportedBy(6L);
+ 
+    matchedItem = new Item();
+    matchedItem.setId(4L);
+    matchedItem.setItemName("Black Wallet");
+    matchedItem.setReportType(Item.ReportType.LOST);
+    matchedItem.setStatus(Item.Status.MATCHED);
+    matchedItem.setMatchedItemId(1L);
+    matchedItem.setCollectTime("Monday 3PM");
+    matchedItem.setCollectMessage("Bring your ID");
+}
+ 
+@Test
+void reportFound_validItem_savedWithCorrectTypeAndStatus() {
+    when(itemRepository.save(any(Item.class))).thenAnswer(inv -> {
+        Item i = inv.getArgument(0);
+        i.setId(10L);
+        return i;
+    });
+ 
+    Item input = new Item();
+    input.setItemName("Black Wallet");
+    input.setCategory("Wallet");
+    input.setReportedBy(3L);
+ 
+    Item result = itemService.reportFound(input);
+ 
+    assertEquals(Item.ReportType.FOUND, result.getReportType());
+    assertEquals(Item.Status.FOUND, result.getStatus());
+    verify(itemRepository).save(input);
+}
+ 
+@Test
+void reportLost_validItem_savedWithCorrectTypeAndStatus() {
+    when(itemRepository.save(any(Item.class))).thenAnswer(inv -> {
+        Item i = inv.getArgument(0);
+        i.setId(11L);
+        return i;
+    });
+ 
+    Item input = new Item();
+    input.setItemName("Blue Bag");
+    input.setCategory("Bag");
+    input.setReportedBy(5L);
+ 
+    Item result = itemService.reportLost(input);
+ 
+    assertEquals(Item.ReportType.LOST, result.getReportType());
+    assertEquals(Item.Status.LOST, result.getStatus());
+    verify(itemRepository).save(input);
+}
+ 
+@Test
+void getAllItems_returnsAllItemsFromRepo() {
+    when(itemRepository.findAll()).thenReturn(List.of(foundItem, lostItem, searchingItem));
+ 
+    List<Item> result = itemService.getAllItems();
+ 
+    assertEquals(3, result.size());
+    verify(itemRepository).findAll();
+}
+ 
+@Test
+void getItemById_validId_returnsItem() {
+    when(itemRepository.findById(1L)).thenReturn(Optional.of(foundItem));
+ 
+    Item result = itemService.getItemById(1L);
+ 
+    assertNotNull(result);
+    assertEquals("Black Wallet", result.getItemName());
+}
+ 
+@Test
+void getItemById_invalidId_throwsRuntimeException() {
+    when(itemRepository.findById(9999L)).thenReturn(Optional.empty());
+ 
+    assertThrows(RuntimeException.class, () ->
+            itemService.getItemById(9999L)
+    );
+}
+ 
+@Test
+void getMyItems_validUserId_returnsOnlyThatUsersItems() {
+    when(itemRepository.findByReportedBy(3L)).thenReturn(List.of(foundItem));
+ 
+    List<Item> result = itemService.getMyItems(3L);
+ 
+    assertEquals(1, result.size());
+}
+ 
+@Test
+void getSearchingItems_returnsOnlyLostAndSearchingStatus() {
+    when(itemRepository.findByReportTypeAndStatus(Item.ReportType.LOST, Item.Status.SEARCHING))
+            .thenReturn(List.of(searchingItem));
+ 
+    List<Item> result = itemService.getSearchingItems();
+ 
+    assertEquals(1, result.size());
+}
+ 
+@Test
+void matchItems_validIds_bothItemsSetToMatched() {
+    when(itemRepository.findById(2L)).thenReturn(Optional.of(lostItem));
+    when(itemRepository.findById(1L)).thenReturn(Optional.of(foundItem));
+    when(itemRepository.save(any(Item.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+    itemService.matchItems(2L, 1L, "Monday 3PM", "Bring your ID");
+ 
+    assertEquals(Item.Status.MATCHED, lostItem.getStatus());
+    assertEquals(Item.Status.MATCHED, foundItem.getStatus());
+    verify(itemRepository, times(2)).save(any(Item.class));
+}
+ 
+@Test
+void publishSearching_lostItem_statusChangesToSearching() {
+    when(itemRepository.findById(2L)).thenReturn(Optional.of(lostItem));
+    when(itemRepository.save(any(Item.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+    Item result = itemService.publishSearching(2L);
+ 
+    assertEquals(Item.Status.SEARCHING, result.getStatus());
+}
+ 
+@Test
+void claimFound_validData_createsNewFoundItem() {
+    when(itemRepository.findById(3L)).thenReturn(Optional.of(searchingItem));
+    when(itemRepository.save(any(Item.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+    Item result = itemService.claimFound(3L, 4L, "Found near main gate");
+ 
+    assertEquals(Item.ReportType.FOUND, result.getReportType());
+    assertEquals(4L, result.getReportedBy());
+}
+ 
+@Test
+void updateStatus_invalidStatusString_throwsException() {
+    when(itemRepository.findById(1L)).thenReturn(Optional.of(foundItem));
+ 
+    assertThrows(IllegalArgumentException.class, () ->
+            itemService.updateStatus(1L, "INVALID_STATUS", null, null)
+    );
+}
+ 
+@Test
+void countByUser_returnsCorrectCount() {
+    when(itemRepository.countByReportedBy(3L)).thenReturn(4L);
+ 
+    long count = itemService.countByUser(3L);
+ 
+    assertEquals(4L, count);
+}
+ 
+}
+ 

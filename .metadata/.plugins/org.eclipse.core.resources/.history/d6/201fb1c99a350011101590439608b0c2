@@ -1,0 +1,101 @@
+package com.itemservice.controller;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.itemservice.entity.Item;
+import com.itemservice.service.ItemService;
+import com.itemservice.service.OtpService;
+
+@RestController
+@RequestMapping("/api/items")
+@CrossOrigin(origins = "http://localhost:5173")
+public class ItemController {
+ 
+    @Autowired
+    private ItemService itemService;
+    
+    @Autowired
+    private OtpService otpService;
+    
+    @PostMapping
+    public ResponseEntity<Item> addItem(@RequestBody Item item) {
+        return ResponseEntity.ok(itemService.addItem(item));
+    }
+ 
+    
+    @GetMapping
+    public ResponseEntity<List<Item>> getAllItems() {
+        return ResponseEntity.ok(itemService.getAllItems());
+    }
+ 
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Item> getItem(@PathVariable Long id) {
+        return ResponseEntity.ok(itemService.getItemById(id));
+    }
+ 
+   
+    @GetMapping("/search")
+    public ResponseEntity<List<Item>> search(@RequestParam String name) {
+        return ResponseEntity.ok(itemService.searchByName(name));
+    }
+ 
+   
+    @GetMapping("/filter")
+    public ResponseEntity<List<Item>> filter(@RequestParam String category) {
+        return ResponseEntity.ok(itemService.filterByCategory(category));
+    }
+ 
+    
+    @PutMapping("/{id}/status")
+    public ResponseEntity<Item> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(itemService.updateStatus(id, body.get("status")));
+    }
+    
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteItem(@PathVariable Long id) {
+        try {
+            itemService.deleteItem(id);
+            return ResponseEntity.ok(Map.of("message", "Item deleted"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+ // Step 1 - Send OTP to user's email before returning item
+    @PostMapping("/{id}/send-otp")
+    public ResponseEntity<?> sendOtp(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        try {
+            otpService.sendOtp(id, body.get("email"));
+            return ResponseEntity.ok(Map.of("message", "OTP sent to " + body.get("email")));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+     
+    @PostMapping("/{id}/verify-otp")
+    public ResponseEntity<?> verifyOtp(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        boolean valid = otpService.verifyOtp(id, body.get("otp"));
+        if (!valid) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid OTP"));
+        }
+        Item item = itemService.updateStatus(id, "RETURNED");
+        return ResponseEntity.ok(Map.of("message", "Item marked as RETURNED", "item", item));
+    }
+     
+    
+}

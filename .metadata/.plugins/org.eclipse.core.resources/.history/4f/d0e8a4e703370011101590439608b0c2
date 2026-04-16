@@ -1,0 +1,59 @@
+package com.itemservice.service;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.itemservice.entity.Item;
+import com.itemservice.repository.ItemRepository;
+
+@Service
+public class ItemService {
+ 
+    @Autowired
+    private ItemRepository itemRepo;
+ 
+    public Item addItem(Item item) {
+        item.setStatus(Item.Status.FOUND); 
+        return itemRepo.save(item);
+    }
+ 
+ 
+    public List<Item> getAllItems() {
+        return itemRepo.findAll();
+    }
+ 
+   
+    public Item getItemById(Long id) {
+        return itemRepo.findById(id)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+    }
+ 
+   
+    public List<Item> searchByName(String name) {
+        return itemRepo.findByItemNameContainingIgnoreCase(name);
+    }
+ 
+   
+    public List<Item> filterByCategory(String category) {
+        return itemRepo.findByCategory(category);
+    }
+ 
+   
+    public Item updateStatus(Long id, String status) {
+        Item item = getItemById(id);
+        item.setStatus(Item.Status.valueOf(status));
+        return itemRepo.save(item);
+    }
+    public void deleteItem(Long id) {
+        Item item = getItemById(id);
+        if (item.getStatus() == Item.Status.CLAIMED ||
+            item.getStatus() == Item.Status.VERIFIED ||
+            item.getStatus() == Item.Status.RETURNED ||
+            item.getStatus() == Item.Status.CLOSED) {
+            throw new RuntimeException("Cannot delete item - it has an active claim");
+        }
+        itemRepo.deleteById(id);
+    }
+}

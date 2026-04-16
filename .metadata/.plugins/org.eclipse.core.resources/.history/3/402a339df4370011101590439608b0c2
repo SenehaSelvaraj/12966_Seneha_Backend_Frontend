@@ -1,0 +1,151 @@
+package com.itemservice.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.itemservice.entity.Item;
+import com.itemservice.repository.ItemRepository;
+import com.itemservice.service.ItemService;
+
+import java.util.List;
+import java.util.Map;
+ 
+@RestController
+@RequestMapping("/api/items")
+@CrossOrigin(origins = "http://localhost:5173")
+public class ItemController {
+ 
+    @Autowired
+    private ItemService itemService;
+ 
+    @Autowired
+    private ItemRepository itemRepository;
+ 
+    
+    @PostMapping("/report-found")
+    public ResponseEntity<Item> reportFound(@RequestBody Item item) {
+        return ResponseEntity.ok(itemService.reportFound(item));
+    }
+ 
+    
+    @PostMapping("/report-lost")
+    public ResponseEntity<Item> reportLost(@RequestBody Item item) {
+        return ResponseEntity.ok(itemService.reportLost(item));
+    }
+ 
+    
+    @GetMapping
+    public ResponseEntity<List<Item>> getAll() {
+        return ResponseEntity.ok(itemService.getAllItems());
+    }
+ 
+  
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(itemService.getItemById(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+   
+    @GetMapping("/my/{userId}")
+    public ResponseEntity<List<Item>> getMyItems(@PathVariable Long userId) {
+        return ResponseEntity.ok(itemService.getMyItems(userId));
+    }
+ 
+    
+    @GetMapping("/searching")
+    public ResponseEntity<List<Item>> getSearching() {
+        return ResponseEntity.ok(itemService.getSearchingItems());
+    }
+ 
+   
+    @PostMapping("/match")
+    public ResponseEntity<?> matchItems(@RequestBody Map<String, Object> body) {
+        try {
+            Long lostId  = Long.valueOf(body.get("lostItemId").toString());
+            Long foundId = Long.valueOf(body.get("foundItemId").toString());
+            String time  = body.get("collectTime")    != null ? body.get("collectTime").toString()    : "";
+            String msg   = body.get("collectMessage") != null ? body.get("collectMessage").toString() : "";
+            return ResponseEntity.ok(itemService.matchItems(lostId, foundId, time, msg));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+   
+    @PutMapping("/{id}/searching")
+    public ResponseEntity<?> publishSearching(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(itemService.publishSearching(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+  
+    @PostMapping("/{id}/i-found-it")
+    public ResponseEntity<?> iFoundIt(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        try {
+            Long userId  = Long.valueOf(body.get("userId").toString());
+            String desc  = body.get("description").toString();
+            return ResponseEntity.ok(itemService.claimFound(id, userId, desc));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+    
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        try {
+            return ResponseEntity.ok(itemService.updateStatus(
+                id,
+                body.get("status"),
+                body.get("collectTime"),
+                body.get("collectMessage")
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @PutMapping("/{id}/urgent")
+    public ResponseEntity<?> markUrgent(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        try {
+            Item item=itemService.getItemById(id);
+            item.setUrgent(true);
+            item.setUrgentReason(body.get("reason"));
+            return ResponseEntity.ok(itemRepository.save(item));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+    @GetMapping("/count/{userId}")
+    public ResponseEntity<?> countByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(Map.of("count", itemService.countByUser(userId)));
+    }
+    
+    @PutMapping("/{id}/acknowledge")
+    public ResponseEntity<?> acknowledge(@PathVariable Long id) {
+        try {
+            Item item = itemService.getItemById(id);
+            item.setAcknowledged(true);
+            return ResponseEntity.ok(itemRepository.save(item));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+     
+}
+ 

@@ -1,0 +1,5 @@
+package com.itemservice.repository;
+
+public class ItemRepository {
+
+}

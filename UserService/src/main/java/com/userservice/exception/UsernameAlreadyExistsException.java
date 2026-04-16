@@ -1,0 +1,15 @@
+package com.userservice.exception;
+
+public class UsernameAlreadyExistsException extends RuntimeException {
+    public UsernameAlreadyExistsException(String message) {
+        super(message);
+    }
+}
+
+// package-private (no 'public')
+class UserNotFoundException extends RuntimeException {
+    public UserNotFoundException(String message) {
+        super(message);
+    }
+}
+

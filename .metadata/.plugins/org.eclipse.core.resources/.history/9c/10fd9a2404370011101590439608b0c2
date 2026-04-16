@@ -1,0 +1,48 @@
+package com.itemservice.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+ 
+@Service
+public class OtpService {
+ 
+    @Autowired
+    private JavaMailSender mailSender;
+ 
+    // Store OTPs in memory: itemId -> otp
+    private Map<Long, String> otpStore = new HashMap<>();
+ 
+    // Generate and send OTP
+    public void sendOtp(Long itemId, String toEmail) {
+        System.out.println("Sending OTP to: " + toEmail + " for item: " + itemId);
+        
+        if (toEmail == null || toEmail.isEmpty()) {
+            throw new RuntimeException("Email is required");
+        }
+     
+        String otp = String.valueOf(new Random().nextInt(900000) + 100000);
+        otpStore.put(itemId, otp);
+     
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Lost & Found - Return Verification OTP");
+        message.setText("Your OTP for collecting item #" + itemId + " is: " + otp);
+        mailSender.send(message);
+    }
+     
+   
+    public boolean verifyOtp(Long itemId, String enteredOtp) {
+        String storedOtp = otpStore.get(itemId);
+        if (storedOtp != null && storedOtp.equals(enteredOtp)) {
+            otpStore.remove(itemId);
+            return true;
+        }
+        return false;
+    }
+}
+ 

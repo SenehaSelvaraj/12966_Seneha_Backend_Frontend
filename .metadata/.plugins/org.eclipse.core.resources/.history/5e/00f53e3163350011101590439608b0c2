@@ -1,0 +1,5 @@
+package com.itemservice.controller;
+
+public class ItemController {
+
+}

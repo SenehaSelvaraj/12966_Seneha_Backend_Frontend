@@ -1,0 +1,134 @@
+package com.itemservice.controller;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.itemservice.entity.Item;
+import com.itemservice.service.ItemService;
+import com.itemservice.service.OtpService;
+
+import java.util.List;
+import java.util.Map;
+ 
+@RestController
+@RequestMapping("/api/items")
+@CrossOrigin(origins = "http://localhost:5173")
+public class ItemController {
+ 
+    @Autowired
+    private ItemService itemService;
+ 
+    @Autowired
+    private OtpService otpService;
+ 
+    
+    @PostMapping("/report-found")
+    public ResponseEntity<Item> reportFound(@RequestBody Item item) {
+        return ResponseEntity.ok(itemService.reportFound(item));
+    }
+ 
+    
+    @PostMapping("/report-lost")
+    public ResponseEntity<Item> reportLost(@RequestBody Item item) {
+        return ResponseEntity.ok(itemService.reportLost(item));
+    }
+ 
+    
+    @GetMapping
+    public ResponseEntity<List<Item>> getAll() {
+        return ResponseEntity.ok(itemService.getAllItems());
+    }
+ 
+    
+    @GetMapping("/my/{userId}")
+    public ResponseEntity<List<Item>> getMyItems(@PathVariable Long userId) {
+        return ResponseEntity.ok(itemService.getMyItems(userId));
+    }
+ 
+    
+    @GetMapping("/searching")
+    public ResponseEntity<List<Item>> getSearching() {
+        return ResponseEntity.ok(itemService.getSearchingItems());
+    }
+ 
+   
+    @PostMapping("/match")
+    public ResponseEntity<?> matchItems(@RequestBody Map<String, Object> body) {
+        try {
+            Long lostId = Long.valueOf(body.get("lostItemId").toString());
+            Long foundId = Long.valueOf(body.get("foundItemId").toString());
+            String time = body.get("collectTime") != null ? body.get("collectTime").toString() : "";
+            String msg = body.get("collectMessage") != null ? body.get("collectMessage").toString() : "";
+            Item result = itemService.matchItems(lostId, foundId, time, msg);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+    
+    @PutMapping("/{id}/searching")
+    public ResponseEntity<?> publishSearching(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(itemService.publishSearching(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+   
+    @PostMapping("/{id}/i-found-it")
+    public ResponseEntity<?> iFoundIt(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        try {
+            Long userId = Long.valueOf(body.get("userId").toString());
+            String desc = body.get("description").toString();
+            return ResponseEntity.ok(itemService.claimFound(id, userId, desc));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+    
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        try {
+            return ResponseEntity.ok(itemService.updateStatus(
+                id,
+                body.get("status"),
+                body.get("collectTime"),
+                body.get("collectMessage")
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+    
+    @GetMapping("/count/{userId}")
+    public ResponseEntity<?> countByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(Map.of("count", itemService.countByUser(userId)));
+    }
+ 
+   
+    @PostMapping("/{id}/send-otp")
+    public ResponseEntity<?> sendOtp(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        try {
+            otpService.sendOtp(id, body.get("email"));
+            return ResponseEntity.ok(Map.of("message", "OTP sent"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+ 
+   
+    @PostMapping("/{id}/verify-otp")
+    public ResponseEntity<?> verifyOtp(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        boolean valid = otpService.verifyOtp(id, body.get("otp"));
+        if (!valid) return ResponseEntity.badRequest().body(Map.of("error", "Invalid OTP"));
+        Item item = itemService.updateStatus(id, "RETURNED", null, null);
+        return ResponseEntity.ok(Map.of("message", "Marked as RETURNED", "item", item));
+    }
+}
+ 

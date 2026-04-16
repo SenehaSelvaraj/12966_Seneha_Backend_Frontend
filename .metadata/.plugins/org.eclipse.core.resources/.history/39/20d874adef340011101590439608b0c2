@@ -1,0 +1,5 @@
+package com.rvz.entity;
+
+public class User {
+
+}

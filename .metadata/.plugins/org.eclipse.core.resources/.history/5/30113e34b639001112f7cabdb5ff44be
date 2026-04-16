@@ -1,0 +1,130 @@
+package com.userservice.service;
+ 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.stereotype.Service;
+ 
+import com.userservice.entity.User;
+import com.userservice.exception.AccountBlockedException;
+import com.userservice.exception.IncorrectPasswordException;
+import com.userservice.exception.MultipleAccountsFoundException;
+import com.userservice.exception.UsernameAlreadyExistsException;
+import com.userservice.repo.UserRepository;
+ 
+import java.util.List;
+ 
+@Service
+public class UserService {
+ 
+    private static final String UNF = "User not found";
+ 
+    @Autowired
+    private UserRepository userRepository;
+ 
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+ 
+    @Autowired
+    private EmailService emailService;
+ 
+    UserService(SecurityFilterChain filterChain) {
+    }
+ 
+    /**
+     * ✅ UPDATED: accepts email; sends temp password email automatically.
+     * rawPassword must be passed in plain text so it can be emailed before encoding.
+     */
+    public User createUser(String username, String rawPassword, String email,
+                           User.Role role, boolean temporaryPassword) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Username cannot be empty");
+        }
+        if (userRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyExistsException("Username already exists");
+        }
+ 
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setEmail(email);
+        user.setRole(role);
+        user.setTemporaryPassword(temporaryPassword);
+ 
+        User saved = userRepository.save(user);
+ 
+        // ✅ Send email if we have an address and this is a temporary password
+        if (temporaryPassword && email != null && !email.trim().isEmpty()) {
+            try {
+                emailService.sendTemporaryPasswordEmail(email, username, rawPassword);
+            } catch (Exception ex) {
+                // Log but don't fail the whole request if email sending fails
+                System.err.println("Warning: could not send temp password email: " + ex.getMessage());
+            }
+        }
+ 
+        return saved;
+    }
+ 
+    /** Overload without email (for self-registration flows) */
+    public User createUser(String username, String password, User.Role role, boolean temporaryPassword) {
+        return createUser(username, password, null, role, temporaryPassword);
+    }
+ 
+    public User createUser(String username, String password, User.Role role) {
+        return createUser(username, password, null, role, false);
+    }
+ 
+    public User login(String username, String password) {
+        User user;
+        try {
+            user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException(UNF));
+        } catch (org.springframework.dao.IncorrectResultSizeDataAccessException e) {
+            throw new MultipleAccountsFoundException("Multiple accounts found. Contact admin.");
+        }
+ 
+        if (user.isBlocked()) {
+            throw new AccountBlockedException("Your account is blocked. Contact admin.");
+        }
+ 
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new IncorrectPasswordException("Incorrect password");
+        }
+ 
+        return user;
+    }
+ 
+    public User changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+ 
+        if (!user.isTemporaryPassword() && !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IncorrectPasswordException("Current password is incorrect");
+        }
+ 
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setTemporaryPassword(false);
+        return userRepository.save(user);
+    }
+ 
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
+    }
+ 
+    public User blockUser(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+        user.setBlocked(true);
+        return userRepository.save(user);
+    }
+ 
+    public User unblockUser(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new UsernameNotFoundException(UNF));
+        user.setBlocked(false);
+        return userRepository.save(user);
+    }
+}
+ 

@@ -1,0 +1,110 @@
+package com.itemservice.service;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.itemservice.entity.Item;
+import com.itemservice.repository.ItemRepository;
+
+import java.util.List;
+ 
+@Service
+public class ItemService {
+ 
+    @Autowired
+    private ItemRepository itemRepository;
+ 
+    // User reports a FOUND item
+    public Item reportFound(Item item) {
+        item.setReportType(Item.ReportType.FOUND);
+        item.setStatus(Item.Status.FOUND);
+        return itemRepository.save(item);
+    }
+ 
+    // User reports a LOST item
+    public Item reportLost(Item item) {
+        item.setReportType(Item.ReportType.LOST);
+        item.setStatus(Item.Status.LOST);
+        return itemRepository.save(item);
+    }
+ 
+    // Get all items — for admin
+    public List<Item> getAllItems() {
+        return itemRepository.findAll();
+    }
+ 
+    // Get items reported by a specific user
+    public List<Item> getMyItems(Long userId) {
+        return itemRepository.findByReportedBy(userId);
+    }
+ 
+    // Get all LOST items that are SEARCHING — shown publicly to all users
+    public List<Item> getSearchingItems() {
+        return itemRepository.findByReportTypeAndStatus(
+            Item.ReportType.LOST, Item.Status.SEARCHING
+        );
+    }
+ 
+    // Admin matches a lost item with a found item
+    public Item matchItems(Long lostItemId, Long foundItemId,
+                           String collectTime, String collectMessage) {
+        Item lostItem = itemRepository.findById(lostItemId)
+            .orElseThrow(() -> new RuntimeException("Lost item not found"));
+        Item foundItem = itemRepository.findById(foundItemId)
+            .orElseThrow(() -> new RuntimeException("Found item not found"));
+ 
+        // Link them together
+        lostItem.setMatchedItemId(foundItemId);
+        lostItem.setStatus(Item.Status.MATCHED);
+        lostItem.setCollectTime(collectTime);
+        lostItem.setCollectMessage(collectMessage);
+ 
+        foundItem.setMatchedItemId(lostItemId);
+        foundItem.setStatus(Item.Status.MATCHED);
+ 
+        itemRepository.save(foundItem);
+        return itemRepository.save(lostItem);
+    }
+ 
+    // Admin publishes a lost item publicly (SEARCHING)
+    public Item publishSearching(Long itemId) {
+        Item item = itemRepository.findById(itemId)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+        item.setStatus(Item.Status.SEARCHING);
+        return itemRepository.save(item);
+    }
+ 
+    // User says "I found this searching item"
+    public Item claimFound(Long searchingItemId, Long foundByUserId, String description) {
+        Item searchingItem = itemRepository.findById(searchingItemId)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+ 
+        // Create a new FOUND report linked to the searching item
+        Item foundReport = new Item();
+        foundReport.setItemName(searchingItem.getItemName());
+        foundReport.setCategory(searchingItem.getCategory());
+        foundReport.setDescription(description);
+        foundReport.setReportType(Item.ReportType.FOUND);
+        foundReport.setStatus(Item.Status.FOUND);
+        foundReport.setReportedBy(foundByUserId);
+        foundReport.setMatchedItemId(searchingItemId);
+        return itemRepository.save(foundReport);
+    }
+ 
+    // Admin updates status
+    public Item updateStatus(Long id, String status,
+                             String collectTime, String collectMessage) {
+        Item item = itemRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Item not found"));
+        item.setStatus(Item.Status.valueOf(status));
+        if (collectTime != null) item.setCollectTime(collectTime);
+        if (collectMessage != null) item.setCollectMessage(collectMessage);
+        return itemRepository.save(item);
+    }
+ 
+    public long countByUser(Long userId) {
+        return itemRepository.countByReportedBy(userId);
+    }
+}
+ 

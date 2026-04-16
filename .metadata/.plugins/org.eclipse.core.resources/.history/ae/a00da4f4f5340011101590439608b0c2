@@ -1,0 +1,15 @@
+package com.userservice.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.userservice.repo.UserRepository;
+
+@Service
+public class UserService {
+
+	
+	@Autowired
+	private UserRepository userRepo;
+	private BCryptPasswordEncoder passwordEncoder =new BCryptPasswordEncoder();
+}

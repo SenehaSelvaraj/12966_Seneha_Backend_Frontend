@@ -1,0 +1,114 @@
+package com.itemservice.entity;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(name = "items")
+public class Item {
+ 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+ 
+    private String itemName;
+    private String category;
+    private String location;
+    private String description;
+ 
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.FOUND;
+ 
+    private Long finderId;
+    private LocalDate foundDate;
+    
+    @CreationTimestamp
+    public LocalDateTime createdAt;
+ 
+    public enum Status { FOUND, LISTED, CLAIMED, VERIFIED, RETURNED, CLOSED }
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
+
+	public String getItemName() {
+		return itemName;
+	}
+
+	public void setItemName(String itemName) {
+		this.itemName = itemName;
+	}
+
+	public String getCategory() {
+		return category;
+	}
+
+	public void setCategory(String category) {
+		this.category = category;
+	}
+
+	public String getLocation() {
+		return location;
+	}
+
+	public void setLocation(String location) {
+		this.location = location;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	public Status getStatus() {
+		return status;
+	}
+
+	public void setStatus(Status status) {
+		this.status = status;
+	}
+
+	public Long getFinderId() {
+		return finderId;
+	}
+
+	public void setFinderId(Long finderId) {
+		this.finderId = finderId;
+	}
+
+	public LocalDate getFoundDate() {
+		return foundDate;
+	}
+
+	public void setFoundDate(LocalDate foundDate) {
+		this.foundDate = foundDate;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
+    
+	
+    
+}

@@ -1,0 +1,15 @@
+package com.itemservice.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.itemservice.entity.Item;
+
+public interface ItemRepository extends JpaRepository<Item, Long> {
+   
+    List<Item> findByItemNameContainingIgnoreCase(String name);
+    List<Item> findByCategory(String category);
+    List<Item> findByStatus(Item.Status status);
+    Long countByFinderId(Long finderId);
+}

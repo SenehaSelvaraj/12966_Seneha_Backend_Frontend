@@ -1,0 +1,74 @@
+package com.userservice.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.userservice.entity.User;
+import com.userservice.repo.UserRepository;
+
+import java.util.List;
+ 
+@Service
+public class UserService {
+ 
+    @Autowired
+    private UserRepository userRepository;
+ 
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+ 
+
+    public User createUser(String username, String password, User.Role role) {
+    	if(userRepository.existsByUsername(username)){
+            throw new RuntimeException("Username already exists");
+        }
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+ 
+   
+    public User login(String username, String password) {
+        User user;
+        try {
+            user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        } catch (org.springframework.dao.IncorrectResultSizeDataAccessException e) {
+            throw new RuntimeException("Multiple accounts found. Contact admin.");
+        }
+ 
+        if (user.isBlocked()) {
+            throw new RuntimeException("Your account is blocked. Contact admin.");
+        }
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Incorrect password");
+        }
+        return user;
+    }
+ 
+    public List<User> getAllUsers() {
+        return userRepository.findAll()
+            .stream()
+            .filter(u -> u.getRole() == User.Role.USER)
+            .collect(java.util.stream.Collectors.toList());
+    }
+ 
+    public User blockUser(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setBlocked(true);
+        return userRepository.save(user);
+    }
+ 
+    public User unblockUser(Long id) {
+        User user = userRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setBlocked(false);
+        return userRepository.save(user);
+    }
+}
+ 
+ 

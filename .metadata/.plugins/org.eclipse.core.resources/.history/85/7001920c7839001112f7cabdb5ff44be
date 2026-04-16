@@ -1,0 +1,197 @@
+package com.userservice.controller;
+ 
+import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.http.ResponseEntity;
+
+import org.springframework.web.bind.annotation.*;
+ 
+import com.userservice.entity.User;
+
+import com.userservice.repo.UserRepository;
+
+import com.userservice.service.UserService;
+ 
+import java.util.List;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/users")
+@CrossOrigin(origins = "http://localhost:5173")
+
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private static final String ERROR="error";
+    private static final String USERNAME="username";
+    private static final String MESSAGE="message";
+    private static final String TEMP_PASS="temporaroPassword";
+    private static final String USERID="userId";
+
+    @PostMapping("/create")
+    public ResponseEntity<Object> createUser(@RequestBody Map<String, String> body) {
+
+        try {
+
+            String role = body.getOrDefault("role", "USER");
+
+            boolean tempPwd = Boolean.parseBoolean(body.getOrDefault(TEMP_PASS, "false"));
+
+            User user = userService.createUser(
+
+                body.get(USERNAME),
+
+                body.get("password"),
+
+                User.Role.valueOf(role),
+
+                tempPwd
+
+            );
+
+            return ResponseEntity.ok(Map.of(
+
+                MESSAGE, "User created successfully",
+
+                USERID, user.getId(),
+
+                USERNAME, user.getUsername(),
+
+                "role", user.getRole(),
+
+                TEMP_PASS, user.isTemporaryPassword()
+
+            ));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.badRequest().body(Map.of(ERROR, e.getMessage()));
+
+        }
+
+    }
+
+
+
+    @PostMapping("/login")
+
+    public ResponseEntity<Object> login(@RequestBody Map<String, String> body) {
+
+        try {
+
+            User user = userService.login(body.get(USERNAME), body.get("password"));
+
+            return ResponseEntity.ok(Map.of(
+
+                USERID, user.getId(),
+
+                USERNAME, user.getUsername(),
+
+                "role", user.getRole(),
+
+                TEMP_PASS, user.isTemporaryPassword()
+
+            ));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.badRequest().body(Map.of(ERROR, e.getMessage()));
+
+        }
+
+    }
+ 
+    /**
+
+     * Change password endpoint.
+
+     * Body: { userId, currentPassword (optional for temp), newPassword }
+
+     */
+
+    @PutMapping("/change-password")
+
+    public ResponseEntity<Object> changePassword(@RequestBody Map<String, String> body) {
+
+        try {
+
+            Long userId = Long.valueOf(body.get(USERID));
+
+            String currentPassword = body.getOrDefault("currentPassword", "");
+
+            String newPassword = body.get("newPassword");
+
+            userService.changePassword(userId, currentPassword, newPassword);
+
+            return ResponseEntity.ok(Map.of(MESSAGE, "Password changed successfully"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.badRequest().body(Map.of(ERROR, e.getMessage()));
+
+        }
+
+    }
+
+    /** Returns ALL users (USER + ADMIN roles). */
+
+    @GetMapping("/all")
+
+    public ResponseEntity<List<User>> getAllUsers() {
+
+        return ResponseEntity.ok(userService.getAllUsers());
+
+    }
+
+    @GetMapping("/check-username")
+
+    public ResponseEntity<Object> checkUsername(@RequestParam String username) {
+
+        return ResponseEntity.ok(Map.of("exists", userRepository.existsByUsername(username)));
+
+    }
+
+    @PutMapping("/{id}/block")
+
+    public ResponseEntity<Object> block(@PathVariable Long id) {
+
+        try {
+
+            userService.blockUser(id);
+
+            return ResponseEntity.ok(Map.of(MESSAGE, "User blocked"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.badRequest().body(Map.of(ERROR, e.getMessage()));
+
+        }
+
+    }
+
+    @PutMapping("/{id}/unblock")
+
+    public ResponseEntity<Object> unblock(@PathVariable Long id) {
+
+        try {
+
+            userService.unblockUser(id);
+
+            return ResponseEntity.ok(Map.of("Message", "User unblocked"));
+
+        } catch (Exception e) {
+
+            return ResponseEntity.badRequest().body(Map.of(ERROR, e.getMessage()));
+
+        }
+
+    }
+
+}
+ 

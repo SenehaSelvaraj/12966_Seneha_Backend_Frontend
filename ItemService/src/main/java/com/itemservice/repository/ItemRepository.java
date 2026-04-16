@@ -1,0 +1,15 @@
+package com.itemservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import com.itemservice.entity.Item;
+import java.util.List;
+ 
+public interface ItemRepository extends JpaRepository<Item, Long> {
+    List<Item> findByReportedBy(Long userId);
+    List<Item> findByReportType(Item.ReportType type);
+    List<Item> findByStatus(Item.Status status);
+    List<Item> findByReportTypeAndStatus(Item.ReportType type, Item.Status status);
+    List<Item> findByCategoryAndReportType(String category, Item.ReportType type);
+    long countByReportedBy(Long userId);
+}
+ 

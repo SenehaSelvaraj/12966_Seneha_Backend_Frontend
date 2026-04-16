@@ -1,0 +1,36 @@
+package com.userservice.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+ 
+@Configuration
+public class SecurityConfig {
+ 
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(); 
+    }
+    @SuppressWarnings("java:S112")
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(request -> {
+                CorsConfiguration config = new CorsConfiguration();
+                config.addAllowedOrigin("http://localhost:5173");
+                config.addAllowedMethod("*");
+                config.addAllowedHeader("*");
+                config.setAllowCredentials(true);
+                return config;
+            }))
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()
+            );
+        return http.build();
+    }
+}
+ 

@@ -1,0 +1,5 @@
+package com.itemservice.entity;
+
+public class Item {
+
+}

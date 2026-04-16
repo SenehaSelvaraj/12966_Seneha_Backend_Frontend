@@ -1,0 +1,280 @@
+package com.userservice.service;
+ 
+import com.userservice.entity.User;
+import com.userservice.repo.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ 
+import java.util.List;
+import java.util.Optional;
+ 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+ 
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+ 
+    @Mock
+    private UserRepository userRepository;
+ 
+    @Mock
+    private BCryptPasswordEncoder passwordEncoder;
+ 
+    @InjectMocks
+    private UserService userService;
+ 
+    private User savedUser;
+    private User blockedUser;
+    private User adminUser;
+    private User tempPasswordUser;
+ 
+    @BeforeEach
+    void setUp() {
+        savedUser = new User();
+        savedUser.setId(1L);
+        savedUser.setUsername("testuser");
+        savedUser.setPassword("$2a$12$hashedpassword");
+        savedUser.setRole(User.Role.USER);
+        savedUser.setBlocked(false);
+        savedUser.setTemporaryPassword(false);
+ 
+        blockedUser = new User();
+        blockedUser.setId(2L);
+        blockedUser.setUsername("blockeduser");
+        blockedUser.setPassword("$2a$12$hashedpassword");
+        blockedUser.setRole(User.Role.USER);
+        blockedUser.setBlocked(true);
+        blockedUser.setTemporaryPassword(false);
+ 
+        adminUser = new User();
+        adminUser.setId(3L);
+        adminUser.setUsername("admin");
+        adminUser.setPassword("$2a$12$hashedadmin");
+        adminUser.setRole(User.Role.ADMIN);
+        adminUser.setBlocked(false);
+        adminUser.setTemporaryPassword(false);
+ 
+        tempPasswordUser = new User();
+        tempPasswordUser.setId(4L);
+        tempPasswordUser.setUsername("newuser");
+        tempPasswordUser.setPassword("$2a$12$hashedtemp");
+        tempPasswordUser.setRole(User.Role.USER);
+        tempPasswordUser.setBlocked(false);
+        tempPasswordUser.setTemporaryPassword(true);
+    }
+ 
+    // ── UC-TC01: Create user with valid inputs ────────────────────────────
+    @Test
+    void createUser_validInputs_userSavedSuccessfully() {
+        when(userRepository.existsByUsername("newuser")).thenReturn(false);
+        when(passwordEncoder.encode("Test@123")).thenReturn("$2a$12$hashed");
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+ 
+        User result = userService.createUser("newuser", "Test@123", User.Role.USER, false);
+ 
+        assertNotNull(result);
+        assertEquals("testuser", result.getUsername());
+        assertFalse(result.isTemporaryPassword());
+        verify(userRepository).save(any(User.class));
+    }
+ 
+    // ── UC-TC02: Create user with duplicate username ───────────────────────
+    @Test
+    void createUser_duplicateUsername_throwsException() {
+        when(userRepository.existsByUsername("testuser")).thenReturn(true);
+ 
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+            userService.createUser("testuser", "Test@123", User.Role.USER, false)
+        );
+ 
+        assertEquals("Username already exists", ex.getMessage());
+        verify(userRepository, never()).save(any());
+    }
+ 
+    // ── UC-TC03: Create user with empty username should fail ──────────────
+    @Test
+    void createUser_emptyUsername_throwsException() {
+        when(userRepository.existsByUsername("")).thenReturn(false);
+ 
+        // Username is empty — service should throw or DB will fail
+        // We simulate service-level check
+        assertThrows(Exception.class, () ->
+            userService.createUser("", "Test@123", User.Role.USER, false)
+        );
+    }
+ 
+    // ── UC-TC04: Create admin account ─────────────────────────────────────
+    @Test
+    void createUser_adminRole_savedWithAdminRole() {
+        when(userRepository.existsByUsername("newadmin")).thenReturn(false);
+        when(passwordEncoder.encode("Admin@123")).thenReturn("$2a$12$hashed");
+        when(userRepository.save(any(User.class))).thenReturn(adminUser);
+ 
+        User result = userService.createUser("newadmin", "Admin@123", User.Role.ADMIN, false);
+ 
+        assertNotNull(result);
+        assertEquals(User.Role.ADMIN, result.getRole());
+    }
+ 
+    // ── UC-TC05: Create with temporary password flag ───────────────────────
+    @Test
+    void createUser_withTempPasswordFlag_userHasTempPasswordTrue() {
+        when(userRepository.existsByUsername("tempuser")).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("$2a$12$hashed");
+        when(userRepository.save(any(User.class))).thenReturn(tempPasswordUser);
+ 
+        User result = userService.createUser("tempuser", "TempPass123", User.Role.USER, true);
+ 
+        assertNotNull(result);
+        assertTrue(result.isTemporaryPassword());
+    }
+ 
+    // ── UC-TC06: Login with valid credentials ─────────────────────────────
+    @Test
+    void login_validCredentials_returnsUser() {
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("Test@123", savedUser.getPassword())).thenReturn(true);
+ 
+        User result = userService.login("testuser", "Test@123");
+ 
+        assertNotNull(result);
+        assertEquals("testuser", result.getUsername());
+        assertEquals(User.Role.USER, result.getRole());
+    }
+ 
+    // ── UC-TC07: Login with wrong password ────────────────────────────────
+    @Test
+    void login_wrongPassword_throwsException() {
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("wrongpwd", savedUser.getPassword())).thenReturn(false);
+ 
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+            userService.login("testuser", "wrongpwd")
+        );
+ 
+        assertEquals("Incorrect password", ex.getMessage());
+    }
+ 
+    // ── UC-TC08: Login with unknown username ──────────────────────────────
+    @Test
+    void login_unknownUsername_throwsException() {
+        when(userRepository.findByUsername("nobody")).thenReturn(Optional.empty());
+ 
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+            userService.login("nobody", "Test@123")
+        );
+ 
+        assertEquals("User not found", ex.getMessage());
+    }
+ 
+    // ── UC-TC09: Login with blocked account ───────────────────────────────
+    @Test
+    void login_blockedAccount_throwsException() {
+        when(userRepository.findByUsername("blockeduser")).thenReturn(Optional.of(blockedUser));
+ 
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+            userService.login("blockeduser", "Test@123")
+        );
+ 
+        assertTrue(ex.getMessage().contains("blocked"));
+    }
+ 
+    // ── UC-TC10: Login returns temporaryPassword flag ─────────────────────
+    @Test
+    void login_tempPasswordUser_returnsTempPasswordTrue() {
+        when(userRepository.findByUsername("newuser")).thenReturn(Optional.of(tempPasswordUser));
+        when(passwordEncoder.matches("TempPass123", tempPasswordUser.getPassword())).thenReturn(true);
+ 
+        User result = userService.login("newuser", "TempPass123");
+ 
+        assertTrue(result.isTemporaryPassword());
+    }
+ 
+    // ── UC-TC11: Get all users returns both roles ─────────────────────────
+    @Test
+    void getAllUsers_returnsBothAdminsAndUsers() {
+        when(userRepository.findAll()).thenReturn(List.of(savedUser, adminUser, tempPasswordUser));
+ 
+        List<User> result = userService.getAllUsers();
+ 
+        assertEquals(3, result.size());
+    }
+ 
+    // ── UC-TC12: Block user ───────────────────────────────────────────────
+    @Test
+    void blockUser_validId_setsBlockedTrue() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(savedUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+        userService.blockUser(1L);
+ 
+        assertTrue(savedUser.isBlocked());
+        verify(userRepository).save(savedUser);
+    }
+ 
+    // ── UC-TC13: Unblock user ─────────────────────────────────────────────
+    @Test
+    void unblockUser_validId_setsBlockedFalse() {
+        when(userRepository.findById(2L)).thenReturn(Optional.of(blockedUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+        userService.unblockUser(2L);
+ 
+        assertFalse(blockedUser.isBlocked());
+        verify(userRepository).save(blockedUser);
+    }
+ 
+    // ── UC-TC14: Block non-existent user ─────────────────────────────────
+    @Test
+    void blockUser_invalidId_throwsException() {
+        when(userRepository.findById(9999L)).thenReturn(Optional.empty());
+ 
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+            userService.blockUser(9999L)
+        );
+ 
+        assertEquals("User not found", ex.getMessage());
+    }
+ 
+    // ── UC-TC15: Change password — temp password user ─────────────────────
+    @Test
+    void changePassword_tempPasswordUser_clearsTemporaryFlag() {
+        when(userRepository.findById(4L)).thenReturn(Optional.of(tempPasswordUser));
+        when(passwordEncoder.encode("NewPass@123")).thenReturn("$2a$12$newHashed");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+ 
+        userService.changePassword(4L, "", "NewPass@123");
+ 
+        assertFalse(tempPasswordUser.isTemporaryPassword());
+        assertEquals("$2a$12$newHashed", tempPasswordUser.getPassword());
+        verify(userRepository).save(tempPasswordUser);
+    }
+ 
+    // ── UC-TC16: Check username exists ────────────────────────────────────
+    @Test
+    void checkUsername_existingUsername_returnsTrue() {
+        when(userRepository.existsByUsername("testuser")).thenReturn(true);
+ 
+        boolean exists = userRepository.existsByUsername("testuser");
+ 
+        assertTrue(exists);
+    }
+ 
+    // ── UC-TC17: Check username not exists ────────────────────────────────
+    @Test
+    void checkUsername_newUsername_returnsFalse() {
+        when(userRepository.existsByUsername("brandnewuser")).thenReturn(false);
+ 
+        boolean exists = userRepository.existsByUsername("brandnewuser");
+ 
+        assertFalse(exists);
+    }
+}
+ 

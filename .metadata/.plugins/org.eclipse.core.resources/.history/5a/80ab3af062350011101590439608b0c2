@@ -1,0 +1,5 @@
+package com.itemservice.service;
+
+public class ItemService {
+
+}
